@@ -22,7 +22,8 @@ export const EventScreen: React.FC = () => {
     setEvent(activeEvent);
     setLoading(false);
 
-    // Mark event as read when displayed
+    // Mark event as read when displayed (only if not already read)
+    // This prevents duplicate entries but allows the event to persist on refresh
     if (activeEvent) {
       await markEventAsRead(user.id, activeEvent.id);
     }
