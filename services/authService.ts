@@ -6,7 +6,7 @@ import Constants from 'expo-constants';
 /**
  * Send magic link email for authentication
  */
-export async function signInWithEmail(email: string): Promise<{ error: Error | null }> {
+export async function signInWithMagicLink(email: string): Promise<{ error: Error | null }> {
   try {
     // Check if Supabase is configured
     const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
@@ -41,13 +41,99 @@ export async function signInWithEmail(email: string): Promise<{ error: Error | n
 
     return { error: null };
   } catch (error) {
-    console.error('Unexpected error in signInWithEmail:', error);
+    console.error('Unexpected error in signInWithMagicLink:', error);
     return { 
       error: error instanceof Error 
         ? error 
         : new Error('An unexpected error occurred. Please try again.') 
     };
   }
+}
+
+/**
+ * Sign in with email and password
+ */
+export async function signInWithPassword(email: string, password: string): Promise<{ error: Error | null }> {
+  try {
+    const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return { 
+        error: new Error('Supabase is not configured. Please check your app.json settings.') 
+      };
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Supabase sign in error:', error);
+      const errorMessage = error.message || 'Failed to sign in. Please check your credentials.';
+      return { 
+        error: new Error(errorMessage) 
+      };
+    }
+
+    return { error: null };
+  } catch (error) {
+    console.error('Unexpected error in signInWithPassword:', error);
+    return { 
+      error: error instanceof Error 
+        ? error 
+        : new Error('An unexpected error occurred. Please try again.') 
+    };
+  }
+}
+
+/**
+ * Sign up with email and password
+ */
+export async function signUpWithPassword(email: string, password: string): Promise<{ error: Error | null }> {
+  try {
+    const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return { 
+        error: new Error('Supabase is not configured. Please check your app.json settings.') 
+      };
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Supabase sign up error:', error);
+      const errorMessage = error.message || 'Failed to create account. Please try again.';
+      return { 
+        error: new Error(errorMessage) 
+      };
+    }
+
+    // If email confirmation is required, the user will need to confirm their email
+    // The session will be available after confirmation
+    return { error: null };
+  } catch (error) {
+    console.error('Unexpected error in signUpWithPassword:', error);
+    return { 
+      error: error instanceof Error 
+        ? error 
+        : new Error('An unexpected error occurred. Please try again.') 
+    };
+  }
+}
+
+/**
+ * Legacy function name for backward compatibility
+ * @deprecated Use signInWithMagicLink instead
+ */
+export async function signInWithEmail(email: string): Promise<{ error: Error | null }> {
+  return signInWithMagicLink(email);
 }
 
 /**
