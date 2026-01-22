@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { TextInput } from './TextInput';
 
 // Comprehensive list of countries
@@ -105,21 +105,15 @@ export const CountryAutocomplete: React.FC<CountryAutocompleteProps> = ({
       />
       {showSuggestions && suggestions.length > 0 && (
         <View style={styles.suggestionsContainer}>
-          <FlatList
-            data={suggestions}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.suggestionItem}
-                onPress={() => handleSelect(item)}
-              >
-                <Text style={styles.suggestionText}>{item}</Text>
-              </TouchableOpacity>
-            )}
-            style={styles.suggestionsList}
-            keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled
-          />
+          {suggestions.map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={styles.suggestionItem}
+              onPress={() => handleSelect(item)}
+            >
+              <Text style={styles.suggestionText}>{item}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       )}
     </View>
@@ -142,15 +136,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 4,
     maxHeight: 200,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
     zIndex: 1000,
-  },
-  suggestionsList: {
-    maxHeight: 200,
   },
   suggestionItem: {
     padding: 16,
