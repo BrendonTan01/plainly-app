@@ -5,12 +5,13 @@ import Constants from 'expo-constants';
  * Supports multiple AI providers for content extraction
  */
 
-export type AIService = 'claude' | 'openai' | 'firecrawl';
+export type AIService = 'claude' | 'openai' | 'groq' | 'firecrawl';
 
 export interface AIConfig {
   service: AIService;
   anthropicApiKey?: string;
   openaiApiKey?: string;
+  groqApiKey?: string;
   firecrawlApiKey?: string;
   minRelevanceThreshold: number;
   relevanceWeights: {
@@ -21,9 +22,9 @@ export interface AIConfig {
   };
 }
 
-// Default configuration
+// Default configuration - using Groq as free default
 const defaultConfig: AIConfig = {
-  service: 'claude', // Recommended: Claude Haiku for cost-effectiveness
+  service: 'groq', // Free tier available, very fast
   minRelevanceThreshold: 20,
   relevanceWeights: {
     interest: 40,
@@ -44,6 +45,7 @@ export function getAIConfig(): AIConfig {
     service: (extra.aiService as AIService) || defaultConfig.service,
     anthropicApiKey: extra.anthropicApiKey || process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '',
     openaiApiKey: extra.openaiApiKey || process.env.EXPO_PUBLIC_OPENAI_API_KEY || '',
+    groqApiKey: extra.groqApiKey || process.env.EXPO_PUBLIC_GROQ_API_KEY || '',
     firecrawlApiKey: extra.firecrawlApiKey || process.env.EXPO_PUBLIC_FIRECRAWL_API_KEY || '',
     minRelevanceThreshold: extra.minRelevanceThreshold || defaultConfig.minRelevanceThreshold,
     relevanceWeights: {

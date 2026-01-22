@@ -31,8 +31,8 @@
     "extra": {
       "supabaseUrl": "https://dfkngfxkkgzuqfvewaal.supabase.co",
       "supabaseAnonKey": "sb_publishable_0Z4LLdKqWobhp3twyIT4qQ_3NtfA5Jg",
-      "aiService": "claude",
-      "anthropicApiKey": "",
+      "aiService": "groq",
+      "groqApiKey": "",
       "minRelevanceThreshold": 20
     }
   }

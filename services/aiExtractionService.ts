@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 import { getAIConfig, EXTRACTION_PROMPT } from '../config/aiConfig';
 import { EventCategory } from '../types';
 
@@ -82,9 +83,100 @@ function extractMainContent(html: string): string {
 }
 
 /**
+ * Parse JSON from AI response (handles markdown code blocks)
+ */
+function parseJsonResponse(responseText: string): any {
+  let jsonText = responseText.trim();
+  
+  // Remove markdown code blocks if present
+  if (jsonText.startsWith('```json')) {
+    jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+  } else if (jsonText.startsWith('```')) {
+    jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+  }
+  
+  return JSON.parse(jsonText);
+}
+
+/**
+ * Validate and normalize extracted data
+ */
+function validateExtractedData(extracted: any): ExtractedEventData {
+  // Validate required fields
+  if (!extracted.title || !extracted.what_happened || !extracted.why_people_care || !extracted.what_this_means) {
+    throw new Error('Extraction missing required fields');
+  }
+
+  // Validate category
+  const validCategories: EventCategory[] = ['politics', 'economy', 'technology', 'health', 'environment', 'international', 'social'];
+  if (!validCategories.includes(extracted.category)) {
+    throw new Error(`Invalid category: ${extracted.category}`);
+  }
+
+  // Set default date if not provided
+  if (!extracted.date) {
+    extracted.date = new Date().toISOString().split('T')[0];
+  }
+
+  return extracted as ExtractedEventData;
+}
+
+/**
+ * Extract structured event data from HTML using Groq
+ */
+async function extractFromHtmlWithGroq(html: string): Promise<ExtractedEventData> {
+  const config = getAIConfig();
+  
+  if (!config.groqApiKey) {
+    throw new Error('Groq API key is not configured. Please set groqApiKey in app.json or environment variables.');
+  }
+
+  const groq = new Groq({
+    apiKey: config.groqApiKey,
+  });
+
+  // Extract main content from HTML
+  const mainContent = extractMainContent(html);
+  
+  if (!mainContent || mainContent.length < 100) {
+    throw new Error('Could not extract sufficient content from the webpage');
+  }
+
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'user',
+          content: `${EXTRACTION_PROMPT}\n\nArticle content:\n\n${mainContent}`,
+        },
+      ],
+      model: 'llama-3.3-70b-versatile', // Free, fast, and capable model
+      temperature: 0.3, // Lower temperature for more consistent extraction
+      max_tokens: 2000,
+      response_format: { type: 'json_object' }, // Request JSON format
+    });
+
+    const responseText = completion.choices[0]?.message?.content || '';
+    
+    if (!responseText) {
+      throw new Error('Empty response from Groq API');
+    }
+
+    const extracted = parseJsonResponse(responseText);
+    return validateExtractedData(extracted);
+  } catch (error) {
+    console.error('Error extracting with Groq:', error);
+    if (error instanceof SyntaxError) {
+      throw new Error('Failed to parse AI response as JSON. The AI may have returned invalid data.');
+    }
+    throw error;
+  }
+}
+
+/**
  * Extract structured event data from HTML using Claude AI
  */
-async function extractFromHtml(html: string): Promise<ExtractedEventData> {
+async function extractFromHtmlWithClaude(html: string): Promise<ExtractedEventData> {
   const config = getAIConfig();
   
   if (!config.anthropicApiKey) {
@@ -119,40 +211,34 @@ async function extractFromHtml(html: string): Promise<ExtractedEventData> {
       ? message.content[0].text 
       : JSON.stringify(message.content[0]);
 
-    // Parse JSON from response
-    // The response might be wrapped in markdown code blocks
-    let jsonText = responseText.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
-
-    const extracted = JSON.parse(jsonText) as ExtractedEventData;
-
-    // Validate required fields
-    if (!extracted.title || !extracted.what_happened || !extracted.why_people_care || !extracted.what_this_means) {
-      throw new Error('Extraction missing required fields');
-    }
-
-    // Validate category
-    const validCategories: EventCategory[] = ['politics', 'economy', 'technology', 'health', 'environment', 'international', 'social'];
-    if (!validCategories.includes(extracted.category)) {
-      throw new Error(`Invalid category: ${extracted.category}`);
-    }
-
-    // Set default date if not provided
-    if (!extracted.date) {
-      extracted.date = new Date().toISOString().split('T')[0];
-    }
-
-    return extracted;
+    const extracted = parseJsonResponse(responseText);
+    return validateExtractedData(extracted);
   } catch (error) {
-    console.error('Error extracting with AI:', error);
+    console.error('Error extracting with Claude:', error);
     if (error instanceof SyntaxError) {
       throw new Error('Failed to parse AI response as JSON. The AI may have returned invalid data.');
     }
     throw error;
+  }
+}
+
+/**
+ * Extract structured event data from HTML using the configured AI service
+ */
+async function extractFromHtml(html: string): Promise<ExtractedEventData> {
+  const config = getAIConfig();
+  
+  switch (config.service) {
+    case 'groq':
+      return extractFromHtmlWithGroq(html);
+    case 'claude':
+      return extractFromHtmlWithClaude(html);
+    case 'openai':
+      throw new Error('OpenAI extraction not yet implemented. Please use Groq or Claude.');
+    case 'firecrawl':
+      throw new Error('Firecrawl extraction not yet implemented. Please use Groq or Claude.');
+    default:
+      throw new Error(`Unsupported AI service: ${config.service}`);
   }
 }
 
