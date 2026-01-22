@@ -1,12 +1,23 @@
 import { supabase } from '../config/supabase';
 import { UserProfile, OnboardingData } from '../types';
 import { mapUserProfileFromDb } from '../utils/dbMapping';
+import Constants from 'expo-constants';
 
 /**
  * Send magic link email for authentication
  */
 export async function signInWithEmail(email: string): Promise<{ error: Error | null }> {
   try {
+    // Check if Supabase is configured
+    const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return { 
+        error: new Error('Supabase is not configured. Please check your app.json settings.') 
+      };
+    }
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
@@ -15,12 +26,27 @@ export async function signInWithEmail(email: string): Promise<{ error: Error | n
     });
 
     if (error) {
-      return { error };
+      console.error('Supabase sign in error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+      });
+      // Return a more descriptive error - Supabase errors have a message property
+      const errorMessage = error.message || 'Failed to send magic link. Please try again.';
+      return { 
+        error: new Error(errorMessage) 
+      };
     }
 
     return { error: null };
   } catch (error) {
-    return { error: error as Error };
+    console.error('Unexpected error in signInWithEmail:', error);
+    return { 
+      error: error instanceof Error 
+        ? error 
+        : new Error('An unexpected error occurred. Please try again.') 
+    };
   }
 }
 

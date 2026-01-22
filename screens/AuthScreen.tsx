@@ -20,13 +20,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       return;
     }
 
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setMessage('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
 
     const { error } = await signInWithEmail(email.trim());
 
     if (error) {
-      setMessage('Something went wrong. Please try again.');
+      console.error('Sign in error:', error);
+      // Show more specific error messages
+      if (error.message) {
+        setMessage(error.message);
+      } else {
+        setMessage('Something went wrong. Please try again.');
+      }
       setLoading(false);
     } else {
       setMessage('Check your email for the magic link to sign in.');
