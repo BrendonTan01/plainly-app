@@ -8,6 +8,7 @@ import { AuthScreen } from './screens/AuthScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { EventScreen } from './screens/EventScreen';
 import { AdminScreen } from './screens/AdminScreen';
+import { PreferencesScreen } from './screens/PreferencesScreen';
 import { UserProfile } from './types';
 
 export type RootStackParamList = {
@@ -15,6 +16,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Event: undefined;
   Admin: undefined;
+  Preferences: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -131,6 +133,16 @@ export default function App() {
         ) : (
           <>
             <Stack.Screen name="Event" component={EventScreen} />
+            <Stack.Screen
+              name="Preferences"
+              component={PreferencesScreen}
+              options={{
+                headerShown: true,
+                title: 'Preferences',
+                headerStyle: { backgroundColor: '#fff' },
+                headerTintColor: '#000',
+              }}
+            />
             {userProfile?.isAdmin && (
               <Stack.Screen
                 name="Admin"

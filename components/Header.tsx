@@ -27,6 +27,12 @@ export const Header: React.FC = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Plainly</Text>
       <View style={styles.actions}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Preferences' as never)}
+          style={styles.button}
+        >
+          <Text style={styles.buttonText}>Preferences</Text>
+        </TouchableOpacity>
         {isAdmin && (
           <TouchableOpacity
             onPress={() => navigation.navigate('Admin' as never)}
