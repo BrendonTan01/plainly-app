@@ -237,34 +237,66 @@ function extractMainContent(content: string, isMarkdown: boolean = false): strin
 }
 
 /**
- * Parse JSON from AI response (handles markdown code blocks)
+ * Parse JSON from AI response (handles markdown code blocks and various formats)
  */
 function parseJsonResponse(responseText: string): any {
   let jsonText = responseText.trim();
   
-  // Remove markdown code blocks if present
+  // Remove markdown code blocks if present (handle various formats)
   if (jsonText.startsWith('```json')) {
-    jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    jsonText = jsonText.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
   } else if (jsonText.startsWith('```')) {
-    jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    jsonText = jsonText.replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '');
   }
   
-  return JSON.parse(jsonText);
+  // Try to find JSON object in the text if it's wrapped in other text
+  const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    jsonText = jsonMatch[0];
+  }
+  
+  // Remove any leading/trailing whitespace again
+  jsonText = jsonText.trim();
+  
+  try {
+    return JSON.parse(jsonText);
+  } catch (parseError) {
+    console.error('JSON parse error. Text received:', jsonText);
+    throw new Error(`Failed to parse JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+  }
 }
 
 /**
  * Validate and normalize extracted data
  */
 function validateExtractedData(extracted: any): ExtractedEventData {
-  // Validate required fields
-  if (!extracted.title || !extracted.what_happened || !extracted.why_people_care || !extracted.what_this_means) {
-    throw new Error('Extraction missing required fields');
+  // Check which required fields are missing
+  const missingFields: string[] = [];
+  if (!extracted.title || (typeof extracted.title === 'string' && extracted.title.trim() === '')) {
+    missingFields.push('title');
+  }
+  if (!extracted.what_happened || (typeof extracted.what_happened === 'string' && extracted.what_happened.trim() === '')) {
+    missingFields.push('what_happened');
+  }
+  if (!extracted.why_people_care || (typeof extracted.why_people_care === 'string' && extracted.why_people_care.trim() === '')) {
+    missingFields.push('why_people_care');
+  }
+  if (!extracted.what_this_means || (typeof extracted.what_this_means === 'string' && extracted.what_this_means.trim() === '')) {
+    missingFields.push('what_this_means');
+  }
+
+  if (missingFields.length > 0) {
+    console.error('Missing required fields:', missingFields);
+    console.error('Extracted data received:', JSON.stringify(extracted, null, 2));
+    throw new Error(`Extraction missing required fields: ${missingFields.join(', ')}`);
   }
 
   // Validate category
   const validCategories: EventCategory[] = ['politics', 'economy', 'technology', 'health', 'environment', 'international', 'social'];
-  if (!validCategories.includes(extracted.category)) {
-    throw new Error(`Invalid category: ${extracted.category}`);
+  if (!extracted.category || !validCategories.includes(extracted.category)) {
+    console.error('Invalid or missing category:', extracted.category);
+    console.error('Extracted data received:', JSON.stringify(extracted, null, 2));
+    throw new Error(`Invalid category: ${extracted.category || 'missing'}. Must be one of: ${validCategories.join(', ')}`);
   }
 
   // Set default date if not provided
@@ -316,7 +348,17 @@ async function extractFromHtmlWithGroq(content: string, isMarkdown: boolean = fa
       throw new Error('Empty response from Groq API');
     }
 
-    const extracted = parseJsonResponse(responseText);
+    console.log('Groq raw response:', responseText);
+    
+    let extracted;
+    try {
+      extracted = parseJsonResponse(responseText);
+      console.log('Parsed JSON:', JSON.stringify(extracted, null, 2));
+    } catch (parseError) {
+      console.error('Failed to parse JSON response:', responseText);
+      throw new Error(`Failed to parse AI response as JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
+    
     return validateExtractedData(extracted);
   } catch (error) {
     console.error('Error extracting with Groq:', error);
