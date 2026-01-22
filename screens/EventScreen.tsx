@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { PersonalizedEvent } from '../types';
 import { getActiveEvent, markEventAsRead } from '../services/eventService';
-import { getCurrentUser } from '../services/authService';
+import { getCurrentUser, getUserProfile, signOut } from '../services/authService';
 import { Header } from '../components/Header';
+import { Button } from '../components/Button';
 
 export const EventScreen: React.FC = () => {
+  const navigation = useNavigation();
   const [event, setEvent] = useState<PersonalizedEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadEvent = async () => {
     const user = await getCurrentUser();
@@ -17,6 +22,10 @@ export const EventScreen: React.FC = () => {
       setLoading(false);
       return;
     }
+
+    setUserEmail(user.email || '');
+    const profile = await getUserProfile(user.id);
+    setIsAdmin(profile?.isAdmin || false);
 
     const activeEvent = await getActiveEvent(user.id);
     setEvent(activeEvent);
@@ -38,11 +47,42 @@ export const EventScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  const handleLogout = async () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            // Navigation will handle redirecting to auth screen via auth state change
+          },
+        },
+      ]
+    );
+  };
+
+  const handleViewProfile = () => {
+    Alert.alert(
+      'Account Information',
+      `Email: ${userEmail}\n${isAdmin ? 'Role: Administrator' : 'Role: User'}`,
+      [{ text: 'OK' }]
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <Header />
         <View style={styles.centerContent}>
           <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+        <View style={styles.buttonContainer}>
+          <Button title="Refresh" onPress={handleRefresh} variant="secondary" />
+          <Button title="Sign Out" onPress={handleLogout} variant="secondary" />
         </View>
       </SafeAreaView>
     );
@@ -51,6 +91,7 @@ export const EventScreen: React.FC = () => {
   if (!event) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <Header />
         <ScrollView
           contentContainerStyle={styles.centerContent}
           refreshControl={
@@ -62,6 +103,19 @@ export const EventScreen: React.FC = () => {
             Check back later for updates on what matters.
           </Text>
         </ScrollView>
+        <View style={styles.buttonContainer}>
+          <Button title="Refresh" onPress={handleRefresh} variant="secondary" />
+          <Button title="Account" onPress={handleViewProfile} variant="secondary" />
+          {isAdmin && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Admin' as never)}
+              style={styles.adminButton}
+            >
+              <Text style={styles.adminButtonText}>Admin</Text>
+            </TouchableOpacity>
+          )}
+          <Button title="Sign Out" onPress={handleLogout} variant="primary" />
+        </View>
       </SafeAreaView>
     );
   }
@@ -110,6 +164,19 @@ export const EventScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+      <View style={styles.buttonContainer}>
+        <Button title="Refresh" onPress={handleRefresh} variant="secondary" />
+        <Button title="Account" onPress={handleViewProfile} variant="secondary" />
+        {isAdmin && (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Admin' as never)}
+            style={styles.adminButton}
+          >
+            <Text style={styles.adminButtonText}>Admin</Text>
+          </TouchableOpacity>
+        )}
+        <Button title="Sign Out" onPress={handleLogout} variant="primary" />
+      </View>
     </SafeAreaView>
   );
 };
@@ -186,5 +253,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#333',
     lineHeight: 28,
+  },
+  buttonContainer: {
+    padding: 16,
+    paddingBottom: 24,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  adminButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#666',
+  },
+  adminButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
   },
 });
