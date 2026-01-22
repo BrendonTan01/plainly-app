@@ -34,23 +34,24 @@ A minimalist mobile app that explains important world events in three clear laye
 npm install
 ```
 
-### 3. Set Up Supabase
+### 3. Set Up Environment Variables
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to SQL Editor and run the schema from `database/schema.sql`
 3. Get your project URL and anon key from Settings > API
-4. Update `app.json` with your Supabase credentials:
+4. Get your Groq API key from [console.groq.com](https://console.groq.com)
+5. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+6. Update `.env` with your actual credentials:
+   ```bash
+   EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   EXPO_PUBLIC_GROQ_API_KEY=your-groq-api-key
+   ```
 
-```json
-{
-  "expo": {
-    "extra": {
-      "supabaseUrl": "https://your-project.supabase.co",
-      "supabaseAnonKey": "your-anon-key"
-    }
-  }
-}
-```
+**Note:** The `.env` file is gitignored and will not be committed. Never commit API keys or secrets to version control.
 
 ### 4. Configure Email Authentication
 

@@ -35,7 +35,7 @@ const defaultConfig: AIConfig = {
 };
 
 /**
- * Get AI configuration from environment variables or app.json
+ * Get AI configuration from environment variables or app.config.js
  */
 export function getAIConfig(): AIConfig {
   const extra = Constants.expoConfig?.extra || {};

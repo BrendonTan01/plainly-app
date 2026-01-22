@@ -2,12 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-// These will be set via environment variables or app.json extra config
+// These will be set via environment variables or app.config.js extra config
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase URL and Anon Key must be set in app.json extra config or environment variables');
+  console.warn('Supabase URL and Anon Key must be set in app.config.js or EXPO_PUBLIC_SUPABASE_URL/EXPO_PUBLIC_SUPABASE_ANON_KEY environment variables');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

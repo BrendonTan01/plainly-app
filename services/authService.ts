@@ -14,7 +14,7 @@ export async function signInWithMagicLink(email: string): Promise<{ error: Error
     
     if (!supabaseUrl || !supabaseAnonKey) {
       return { 
-        error: new Error('Supabase is not configured. Please check your app.json settings.') 
+        error: new Error('Supabase is not configured. Please check your app.config.js or environment variables (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY).') 
       };
     }
 
@@ -60,7 +60,7 @@ export async function signInWithPassword(email: string, password: string): Promi
     
     if (!supabaseUrl || !supabaseAnonKey) {
       return { 
-        error: new Error('Supabase is not configured. Please check your app.json settings.') 
+        error: new Error('Supabase is not configured. Please check your app.config.js or environment variables (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY).') 
       };
     }
 
@@ -98,7 +98,7 @@ export async function signUpWithPassword(email: string, password: string): Promi
     
     if (!supabaseUrl || !supabaseAnonKey) {
       return { 
-        error: new Error('Supabase is not configured. Please check your app.json settings.') 
+        error: new Error('Supabase is not configured. Please check your app.config.js or environment variables (EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY).') 
       };
     }
 

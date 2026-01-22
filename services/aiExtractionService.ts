@@ -128,7 +128,7 @@ async function extractFromHtmlWithGroq(html: string): Promise<ExtractedEventData
   const config = getAIConfig();
   
   if (!config.groqApiKey) {
-    throw new Error('Groq API key is not configured. Please set groqApiKey in app.json or environment variables.');
+    throw new Error('Groq API key is not configured. Please set EXPO_PUBLIC_GROQ_API_KEY in your .env file or environment variables.');
   }
 
   const groq = new Groq({
@@ -180,7 +180,7 @@ async function extractFromHtmlWithClaude(html: string): Promise<ExtractedEventDa
   const config = getAIConfig();
   
   if (!config.anthropicApiKey) {
-    throw new Error('Anthropic API key is not configured. Please set anthropicApiKey in app.json or environment variables.');
+    throw new Error('Anthropic API key is not configured. Please set EXPO_PUBLIC_ANTHROPIC_API_KEY in your .env file or environment variables.');
   }
 
   const client = new Anthropic({
