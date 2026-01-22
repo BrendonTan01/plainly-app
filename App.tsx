@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Linking } from 'react-native';
 import { supabase } from './config/supabase';
 import { getCurrentUser, getUserProfile } from './services/authService';
 import { AuthScreen } from './screens/AuthScreen';
@@ -28,9 +28,30 @@ export default function App() {
     // Check initial session
     checkSession();
 
+    // Handle deep linking for magic link authentication
+    const handleDeepLink = async (url: string | null) => {
+      if (!url) return;
+      
+      // Check if this is a Supabase auth callback
+      if (url.includes('#access_token=') || url.includes('?access_token=')) {
+        console.log('Handling auth callback from deep link:', url);
+        // Supabase will automatically handle the session from the URL
+        // when detectSessionInUrl is enabled
+      }
+    };
+
+    // Get initial URL if app was opened via deep link
+    Linking.getInitialURL().then(handleDeepLink);
+
+    // Listen for deep links while app is running
+    const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event);
         if (session?.user) {
           setUser(session.user);
           const profile = await getUserProfile(session.user.id);
@@ -44,7 +65,8 @@ export default function App() {
     );
 
     return () => {
-      subscription.unsubscribe();
+      linkingSubscription.remove();
+      authSubscription.unsubscribe();
     };
   }, []);
 
