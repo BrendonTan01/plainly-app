@@ -107,6 +107,44 @@ npm start
 - Check that the event hasn't expired (`expires_at > NOW()`)
 - Ensure the user hasn't already read the event
 
+### Android SDK Path Error
+If you see "Failed to resolve the Android SDK path" or "spawn adb ENOENT":
+
+1. **Install Android Studio** (if not already installed):
+   - Download from [developer.android.com/studio](https://developer.android.com/studio)
+   - Install and open Android Studio
+   - Go through the setup wizard to install Android SDK
+
+2. **Set ANDROID_HOME environment variable**:
+   
+   For **zsh** (default on macOS):
+   ```bash
+   # Add to ~/.zshrc
+   export ANDROID_HOME=$HOME/Library/Android/sdk
+   export PATH=$PATH:$ANDROID_HOME/emulator
+   export PATH=$PATH:$ANDROID_HOME/platform-tools
+   export PATH=$PATH:$ANDROID_HOME/tools
+   export PATH=$PATH:$ANDROID_HOME/tools/bin
+   ```
+   
+   Then reload your shell:
+   ```bash
+   source ~/.zshrc
+   ```
+
+3. **Verify installation**:
+   ```bash
+   echo $ANDROID_HOME
+   adb version
+   ```
+
+4. **If SDK is in a different location**:
+   - Open Android Studio → Preferences → Appearance & Behavior → System Settings → Android SDK
+   - Note the "Android SDK Location" path
+   - Use that path instead of `$HOME/Library/Android/sdk` in the export commands above
+
+5. **Restart your terminal and Expo development server** after setting up ANDROID_HOME
+
 ## Database Management
 
 ### View Data in Supabase

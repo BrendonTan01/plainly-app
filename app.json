@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -30,8 +29,8 @@
     },
     "scheme": "plainly",
     "extra": {
-      "supabaseUrl": "",
-      "supabaseAnonKey": ""
+      "supabaseUrl": "https://dfkngfxkkgzuqfvewaal.supabase.co",
+      "supabaseAnonKey": "sb_publishable_0Z4LLdKqWobhp3twyIT4qQ_3NtfA5Jg"
     }
   }
 }
