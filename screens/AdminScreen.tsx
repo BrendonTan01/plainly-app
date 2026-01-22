@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { TextInput } from '../components/TextInput';
 import { Button } from '../components/Button';
 import { createEvent } from '../services/eventService';
 import { getCurrentUser, getUserProfile } from '../services/authService';
+import { extractFromUrl, formatAsEvent } from '../services/aiExtractionService';
+import { createDraft, updateDraft } from '../services/draftService';
 import { EventCategory } from '../types';
 
 const CATEGORIES: { value: EventCategory; label: string }[] = [
@@ -18,8 +20,14 @@ const CATEGORIES: { value: EventCategory; label: string }[] = [
   { value: 'social', label: 'Social' },
 ];
 
+type EntryMode = 'manual' | 'url';
+
 export const AdminScreen: React.FC = () => {
   const navigation = useNavigation();
+  const [entryMode, setEntryMode] = useState<EntryMode>('manual');
+  const [url, setUrl] = useState('');
+  const [extracting, setExtracting] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [category, setCategory] = useState<EventCategory>('politics');
@@ -50,6 +58,80 @@ export const AdminScreen: React.FC = () => {
     checkAdminStatus();
   }, [navigation]);
 
+  const handleExtractFromUrl = async () => {
+    if (!url || !url.trim()) {
+      setMessage('Please enter a valid URL');
+      return;
+    }
+
+    setExtracting(true);
+    setMessage('');
+
+    try {
+      const extracted = await extractFromUrl(url.trim());
+      
+      // Populate form fields with extracted data
+      setTitle(extracted.title);
+      setDate(extracted.date);
+      setCategory(extracted.category);
+      setWhatHappened(extracted.what_happened);
+      setWhyPeopleCare(extracted.why_people_care);
+      setWhatThisMeans(extracted.what_this_means);
+      setWhatLikelyDoesNotChange(extracted.what_likely_does_not_change || '');
+
+      // Save as draft
+      const draft = await createDraft(url.trim(), extracted, {
+        title: extracted.title,
+        date: extracted.date,
+        category: extracted.category,
+        whatHappened: extracted.what_happened,
+        whyPeopleCare: extracted.why_people_care,
+        whatThisMeans: extracted.what_this_means,
+        whatLikelyDoesNotChange: extracted.what_likely_does_not_change,
+      });
+
+      if (draft) {
+        setCurrentDraftId(draft.id);
+        setMessage('Content extracted successfully! Review and edit before publishing.');
+      } else {
+        setMessage('Content extracted, but failed to save draft.');
+      }
+    } catch (error) {
+      console.error('Extraction error:', error);
+      setMessage(error instanceof Error ? error.message : 'Failed to extract content from URL. Please try again.');
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!currentDraftId) {
+      setMessage('No draft to save');
+      return;
+    }
+
+    setLoading(true);
+    setMessage('');
+
+    const updated = await updateDraft(currentDraftId, {
+      title,
+      date,
+      category,
+      whatHappened,
+      whyPeopleCare,
+      whatThisMeans,
+      whatLikelyDoesNotChange: whatLikelyDoesNotChange || undefined,
+    });
+
+    if (updated) {
+      setMessage('Draft saved successfully!');
+    } else {
+      setMessage('Failed to save draft. Please try again.');
+    }
+
+    setLoading(false);
+  };
+
   const handleSubmit = async () => {
     if (!title || !whatHappened || !whyPeopleCare || !whatThisMeans) {
       setMessage('Please fill in all required fields');
@@ -74,13 +156,23 @@ export const AdminScreen: React.FC = () => {
     });
 
     if (event) {
+      // Update draft status to published if it exists
+      if (currentDraftId) {
+        await updateDraft(currentDraftId, { status: 'published' });
+      }
+
       setMessage('Event created successfully!');
       // Reset form
       setTitle('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setCategory('politics');
       setWhatHappened('');
       setWhyPeopleCare('');
       setWhatThisMeans('');
       setWhatLikelyDoesNotChange('');
+      setUrl('');
+      setCurrentDraftId(null);
+      setEntryMode('manual');
       // Navigate back to event screen after a short delay
       setTimeout(() => {
         navigation.navigate('Event' as never);
@@ -120,6 +212,55 @@ export const AdminScreen: React.FC = () => {
         >
           <View style={styles.content}>
             <Text style={styles.title}>Create Event</Text>
+
+            {/* Entry Mode Toggle */}
+            <View style={styles.modeToggle}>
+              <TouchableOpacity
+                style={[styles.modeButton, entryMode === 'manual' && styles.modeButtonActive]}
+                onPress={() => setEntryMode('manual')}
+              >
+                <Text style={[styles.modeButtonText, entryMode === 'manual' && styles.modeButtonTextActive]}>
+                  Manual Entry
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeButton, entryMode === 'url' && styles.modeButtonActive]}
+                onPress={() => setEntryMode('url')}
+              >
+                <Text style={[styles.modeButtonText, entryMode === 'url' && styles.modeButtonTextActive]}>
+                  Extract from URL
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* URL Extraction Mode */}
+            {entryMode === 'url' && (
+              <View style={styles.urlSection}>
+                <TextInput
+                  label="Article URL"
+                  value={url}
+                  onChangeText={setUrl}
+                  placeholder="https://example.com/article"
+                  keyboardType="url"
+                  autoCapitalize="none"
+                />
+                <Button
+                  title={extracting ? "Extracting..." : "Extract Content"}
+                  onPress={handleExtractFromUrl}
+                  loading={extracting}
+                  disabled={extracting || !url.trim()}
+                />
+                {currentDraftId && (
+                  <Button
+                    title="Save Draft"
+                    onPress={handleSaveDraft}
+                    variant="secondary"
+                    loading={loading}
+                    disabled={loading}
+                  />
+                )}
+              </View>
+            )}
 
             <TextInput
               label="Title *"
@@ -259,5 +400,37 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#666',
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  modeButtonActive: {
+    backgroundColor: '#000',
+  },
+  modeButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+  },
+  modeButtonTextActive: {
+    color: '#fff',
+  },
+  urlSection: {
+    marginBottom: 24,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
 });

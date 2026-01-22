@@ -2,11 +2,12 @@ import { supabase } from '../config/supabase';
 import { Event, UserProfile, PersonalizedEvent } from '../types';
 import { personalizeEvent } from '../utils/personalization';
 import { mapEventFromDb, mapUserProfileFromDb } from '../utils/dbMapping';
+import { calculateRelevanceScore } from '../utils/relevanceScoring';
 
 /**
  * Get the active event for a user
- * Returns the most recent non-expired event, even if it has been read
- * This ensures articles persist on page refresh
+ * Returns the most relevant non-expired event based on user preferences
+ * Falls back to most recent event if no events meet relevance threshold
  */
 export async function getActiveEvent(userId: string): Promise<PersonalizedEvent | null> {
   try {
@@ -24,14 +25,13 @@ export async function getActiveEvent(userId: string): Promise<PersonalizedEvent 
 
     const userProfile = mapUserProfileFromDb(profile);
 
-    // Get the most recent non-expired event (even if already read)
+    // Get all non-expired events
     const now = new Date().toISOString();
     const { data: events, error: eventsError } = await supabase
       .from('events')
       .select('*')
       .gt('expires_at', now)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .order('created_at', { ascending: false });
 
     if (eventsError) {
       console.error('Error fetching events:', eventsError);
@@ -42,10 +42,41 @@ export async function getActiveEvent(userId: string): Promise<PersonalizedEvent 
       return null;
     }
 
-    const event = mapEventFromDb(events[0]);
+    // Map database events to Event type
+    const mappedEvents = events.map(mapEventFromDb);
+
+    // Calculate relevance scores for each event
+    const scoredEvents = mappedEvents.map(event => ({
+      event,
+      score: calculateRelevanceScore(event, userProfile)
+    }));
+
+    // Filter by minimum relevance threshold
+    const MIN_RELEVANCE_THRESHOLD = 20;
+    const relevantEvents = scoredEvents.filter(se => se.score >= MIN_RELEVANCE_THRESHOLD);
+
+    // Sort by score DESC, then created_at DESC
+    relevantEvents.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return new Date(b.event.createdAt).getTime() - new Date(a.event.createdAt).getTime();
+    });
+
+    // Get top event (or most recent if no relevant events)
+    let selectedEvent: Event;
+    if (relevantEvents.length > 0) {
+      selectedEvent = relevantEvents[0].event;
+    } else {
+      // Fallback to most recent event if no events meet threshold
+      const sortedByDate = [...mappedEvents].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      selectedEvent = sortedByDate[0];
+    }
 
     // Personalize the event (regardless of read status)
-    return personalizeEvent(event, userProfile);
+    return personalizeEvent(selectedEvent, userProfile);
   } catch (error) {
     console.error('Error in getActiveEvent:', error);
     return null;
@@ -110,5 +141,66 @@ export async function createEvent(event: Omit<Event, 'id' | 'createdAt' | 'updat
   } catch (error) {
     console.error('Error in createEvent:', error);
     return null;
+  }
+}
+
+/**
+ * Get event recommendations for a user
+ * Returns top N events ranked by relevance to user preferences
+ */
+export async function getEventRecommendations(userId: string, limit: number = 5): Promise<PersonalizedEvent[]> {
+  try {
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('Error fetching user profile:', profileError);
+      return [];
+    }
+
+    const userProfile = mapUserProfileFromDb(profile);
+
+    // Get all non-expired events
+    const now = new Date().toISOString();
+    const { data: events, error: eventsError } = await supabase
+      .from('events')
+      .select('*')
+      .gt('expires_at', now)
+      .order('created_at', { ascending: false });
+
+    if (eventsError) {
+      console.error('Error fetching events:', eventsError);
+      return [];
+    }
+
+    if (!events || events.length === 0) {
+      return [];
+    }
+
+    // Map and score events
+    const mappedEvents = events.map(mapEventFromDb);
+    const scoredEvents = mappedEvents.map(event => ({
+      event,
+      score: calculateRelevanceScore(event, userProfile)
+    }));
+
+    // Sort by score DESC, then created_at DESC
+    scoredEvents.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return new Date(b.event.createdAt).getTime() - new Date(a.event.createdAt).getTime();
+    });
+
+    // Get top N events and personalize them
+    const topEvents = scoredEvents.slice(0, limit).map(se => se.event);
+    return topEvents.map(event => personalizeEvent(event, userProfile));
+  } catch (error) {
+    console.error('Error in getEventRecommendations:', error);
+    return [];
   }
 }

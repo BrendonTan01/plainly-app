@@ -62,3 +62,23 @@ export interface OnboardingData {
   interests: Interest[];
   riskTolerance: RiskTolerance;
 }
+
+// Draft types
+export type DraftStatus = 'extracting' | 'draft' | 'published' | 'rejected';
+
+export interface EventDraft {
+  id: string;
+  adminId: string;
+  sourceUrl: string;
+  extractedData?: any;
+  title?: string;
+  date?: string;
+  category?: EventCategory;
+  whatHappened?: string;
+  whyPeopleCare?: string;
+  whatThisMeans?: string;
+  whatLikelyDoesNotChange?: string;
+  status: DraftStatus;
+  createdAt: string;
+  updatedAt: string;
+}
