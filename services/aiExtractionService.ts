@@ -14,7 +14,93 @@ export interface ExtractedEventData {
 }
 
 /**
- * Fetch HTML content from a URL
+ * Fetch content from a URL using Firecrawl API
+ * Returns clean Markdown content, which is more efficient for LLM processing
+ */
+async function fetchContentFromFirecrawl(url: string): Promise<string> {
+  const config = getAIConfig();
+  
+  if (!config.firecrawlApiKey) {
+    throw new Error('Firecrawl API key is not configured. Please set EXPO_PUBLIC_FIRECRAWL_API_KEY in your .env file or environment variables.');
+  }
+
+  try {
+    // Validate and normalize URL
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      throw new Error('URL cannot be empty');
+    }
+
+    let urlObj: URL;
+    try {
+      let urlToValidate = trimmedUrl;
+      if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+        urlToValidate = `https://${trimmedUrl}`;
+      }
+      urlObj = new URL(urlToValidate);
+    } catch (urlError) {
+      throw new Error(`Invalid URL format: ${trimmedUrl}. Please include http:// or https://`);
+    }
+
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      throw new Error('URL must use http or https protocol');
+    }
+
+    const finalUrl = urlObj.toString();
+
+    // Call Firecrawl API
+    const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.firecrawlApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: finalUrl,
+        formats: ['markdown'], // Get clean Markdown instead of HTML
+        onlyMainContent: true, // Focus on article content, skip navigation/ads
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        throw new Error('Firecrawl API key is invalid. Please check your EXPO_PUBLIC_FIRECRAWL_API_KEY.');
+      } else if (response.status === 429) {
+        throw new Error('Firecrawl rate limit exceeded. Please wait before trying again or upgrade your plan.');
+      } else if (response.status === 402) {
+        throw new Error('Firecrawl credits exhausted. Please add credits to your account.');
+      } else if (response.status >= 500) {
+        throw new Error(`Firecrawl server error (${response.status}). Please try again later.`);
+      }
+      throw new Error(`Firecrawl API error: ${response.status} ${response.statusText}. ${errorData.error || ''}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.data) {
+      throw new Error('Firecrawl returned empty response');
+    }
+
+    // Prefer Markdown, fallback to content if Markdown not available
+    const content = data.data.markdown || data.data.content;
+    
+    if (!content || content.length === 0) {
+      throw new Error('Firecrawl returned empty content from the URL');
+    }
+
+    return content;
+  } catch (error) {
+    console.error('Error fetching from Firecrawl:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Unexpected error while fetching from Firecrawl: ${String(error)}`);
+  }
+}
+
+/**
+ * Fetch HTML content from a URL (fallback method)
  * Note: In a React Native environment, you may need to use a different approach
  * For web, fetch works. For mobile, consider using expo-web-browser or a backend proxy
  */
@@ -104,12 +190,22 @@ async function fetchHtmlFromUrl(url: string): Promise<string> {
 }
 
 /**
- * Extract main content from HTML (simple implementation)
- * In production, consider using a library like Readability or Mercury Parser
+ * Extract main content from HTML or Markdown
+ * If content is already Markdown (from Firecrawl), return it directly
+ * Otherwise, extract and clean HTML content
  */
-function extractMainContent(html: string): string {
+function extractMainContent(content: string, isMarkdown: boolean = false): string {
+  // If already Markdown, just clean and limit length
+  if (isMarkdown) {
+    // Clean up excessive whitespace
+    let text = content.replace(/\n{3,}/g, '\n\n').trim();
+    // Limit length to avoid token limits (keep first 12000 characters for Markdown)
+    return text.substring(0, 12000);
+  }
+
+  // HTML processing (original logic)
   // Remove script and style tags
-  let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  let text = content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   
   // Extract text from common article containers
@@ -180,9 +276,9 @@ function validateExtractedData(extracted: any): ExtractedEventData {
 }
 
 /**
- * Extract structured event data from HTML using Groq
+ * Extract structured event data from HTML or Markdown using Groq
  */
-async function extractFromHtmlWithGroq(html: string): Promise<ExtractedEventData> {
+async function extractFromHtmlWithGroq(content: string, isMarkdown: boolean = false): Promise<ExtractedEventData> {
   const config = getAIConfig();
   
   if (!config.groqApiKey) {
@@ -193,8 +289,8 @@ async function extractFromHtmlWithGroq(html: string): Promise<ExtractedEventData
     apiKey: config.groqApiKey,
   });
 
-  // Extract main content from HTML
-  const mainContent = extractMainContent(html);
+  // Extract main content (handles both HTML and Markdown)
+  const mainContent = extractMainContent(content, isMarkdown);
   
   if (!mainContent || mainContent.length < 100) {
     throw new Error('Could not extract sufficient content from the webpage');
@@ -232,9 +328,9 @@ async function extractFromHtmlWithGroq(html: string): Promise<ExtractedEventData
 }
 
 /**
- * Extract structured event data from HTML using Claude AI
+ * Extract structured event data from HTML or Markdown using Claude AI
  */
-async function extractFromHtmlWithClaude(html: string): Promise<ExtractedEventData> {
+async function extractFromHtmlWithClaude(content: string, isMarkdown: boolean = false): Promise<ExtractedEventData> {
   const config = getAIConfig();
   
   if (!config.anthropicApiKey) {
@@ -245,8 +341,8 @@ async function extractFromHtmlWithClaude(html: string): Promise<ExtractedEventDa
     apiKey: config.anthropicApiKey,
   });
 
-  // Extract main content from HTML
-  const mainContent = extractMainContent(html);
+  // Extract main content (handles both HTML and Markdown)
+  const mainContent = extractMainContent(content, isMarkdown);
   
   if (!mainContent || mainContent.length < 100) {
     throw new Error('Could not extract sufficient content from the webpage');
@@ -281,20 +377,30 @@ async function extractFromHtmlWithClaude(html: string): Promise<ExtractedEventDa
 }
 
 /**
- * Extract structured event data from HTML using the configured AI service
+ * Extract structured event data from HTML or Markdown using the configured AI service
+ * @param content - HTML or Markdown content
+ * @param isMarkdown - Whether the content is Markdown (from Firecrawl) or HTML
  */
-async function extractFromHtml(html: string): Promise<ExtractedEventData> {
+async function extractFromHtml(content: string, isMarkdown: boolean = false): Promise<ExtractedEventData> {
   const config = getAIConfig();
   
   switch (config.service) {
     case 'groq':
-      return extractFromHtmlWithGroq(html);
+      return extractFromHtmlWithGroq(content, isMarkdown);
     case 'claude':
-      return extractFromHtmlWithClaude(html);
+      return extractFromHtmlWithClaude(content, isMarkdown);
     case 'openai':
       throw new Error('OpenAI extraction not yet implemented. Please use Groq or Claude.');
     case 'firecrawl':
-      throw new Error('Firecrawl extraction not yet implemented. Please use Groq or Claude.');
+      // Firecrawl is used for scraping, but we still need an LLM for extraction
+      // Default to Groq if available, otherwise Claude
+      if (config.groqApiKey) {
+        return extractFromHtmlWithGroq(content, isMarkdown);
+      } else if (config.anthropicApiKey) {
+        return extractFromHtmlWithClaude(content, isMarkdown);
+      } else {
+        throw new Error('Firecrawl scraping requires either Groq or Claude API key for extraction. Please configure EXPO_PUBLIC_GROQ_API_KEY or EXPO_PUBLIC_ANTHROPIC_API_KEY.');
+      }
     default:
       throw new Error(`Unsupported AI service: ${config.service}`);
   }
@@ -302,15 +408,35 @@ async function extractFromHtml(html: string): Promise<ExtractedEventData> {
 
 /**
  * Extract event data from a URL
- * Fetches the webpage, extracts content, and uses AI to structure it
+ * Uses Firecrawl if configured, otherwise falls back to basic fetch
+ * Then extracts content using AI to structure it
  */
 export async function extractFromUrl(url: string): Promise<ExtractedEventData> {
   try {
-    // Fetch HTML
-    const html = await fetchHtmlFromUrl(url);
+    const config = getAIConfig();
+    let content: string;
+    let isMarkdown = false;
+
+    // Try Firecrawl first if API key is configured
+    if (config.firecrawlApiKey) {
+      try {
+        content = await fetchContentFromFirecrawl(url);
+        isMarkdown = true; // Firecrawl returns Markdown
+        console.log('Successfully fetched content using Firecrawl');
+      } catch (firecrawlError) {
+        console.warn('Firecrawl failed, falling back to basic fetch:', firecrawlError);
+        // Fallback to basic fetch if Firecrawl fails
+        content = await fetchHtmlFromUrl(url);
+        isMarkdown = false;
+      }
+    } else {
+      // No Firecrawl API key, use basic fetch
+      content = await fetchHtmlFromUrl(url);
+      isMarkdown = false;
+    }
     
-    // Extract using AI
-    const extracted = await extractFromHtml(html);
+    // Extract using AI (handles both HTML and Markdown)
+    const extracted = await extractFromHtml(content, isMarkdown);
     
     return extracted;
   } catch (error) {
