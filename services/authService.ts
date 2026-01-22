@@ -1,0 +1,136 @@
+import { supabase } from '../config/supabase';
+import { UserProfile, OnboardingData } from '../types';
+import { mapUserProfileFromDb } from '../utils/dbMapping';
+
+/**
+ * Send magic link email for authentication
+ */
+export async function signInWithEmail(email: string): Promise<{ error: Error | null }> {
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: 'plainly://auth/callback',
+      },
+    });
+
+    if (error) {
+      return { error };
+    }
+
+    return { error: null };
+  } catch (error) {
+    return { error: error as Error };
+  }
+}
+
+/**
+ * Get current user session
+ */
+export async function getCurrentUser() {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error || !user) {
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+}
+
+/**
+ * Sign out current user
+ */
+export async function signOut(): Promise<{ error: Error | null }> {
+  try {
+    const { error } = await supabase.auth.signOut();
+    return { error };
+  } catch (error) {
+    return { error: error as Error };
+  }
+}
+
+/**
+ * Get or create user profile
+ */
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+
+    if (!data) {
+      // Get user email from auth
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email || '';
+
+      // Create new profile
+      const { data: newProfile, error: createError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: userId,
+          email: email,
+          onboarding_completed: false,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating user profile:', createError);
+        return null;
+      }
+
+      return mapUserProfileFromDb(newProfile);
+    }
+
+    return mapUserProfileFromDb(data);
+  } catch (error) {
+    console.error('Error in getUserProfile:', error);
+    return null;
+  }
+}
+
+/**
+ * Update user profile with onboarding data
+ */
+export async function updateUserProfile(
+  userId: string,
+  onboardingData: OnboardingData
+): Promise<UserProfile | null> {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({
+        country: onboardingData.country,
+        career_field: onboardingData.careerField,
+        interests: onboardingData.interests,
+        risk_tolerance: onboardingData.riskTolerance,
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating user profile:', error);
+      return null;
+    }
+
+    return mapUserProfileFromDb(data);
+  } catch (error) {
+    console.error('Error in updateUserProfile:', error);
+    return null;
+  }
+}

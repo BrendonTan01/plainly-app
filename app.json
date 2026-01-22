@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "plainly-app",
+    "name": "Plainly",
     "slug": "plainly-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.plainly.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +22,16 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.plainly.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "scheme": "plainly",
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
     }
   }
 }
