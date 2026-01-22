@@ -32,7 +32,7 @@
       "supabaseUrl": "https://dfkngfxkkgzuqfvewaal.supabase.co",
       "supabaseAnonKey": "sb_publishable_0Z4LLdKqWobhp3twyIT4qQ_3NtfA5Jg",
       "aiService": "groq",
-      "groqApiKey": "",
+      "groqApiKey": "${GROQ_API_KEY}",
       "minRelevanceThreshold": 20
     }
   }

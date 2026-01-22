@@ -110,6 +110,10 @@ CREATE POLICY "Users can read own event reads" ON user_event_reads
 CREATE POLICY "Users can insert own event reads" ON user_event_reads
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+-- Users can update their own read records (needed for upsert operations)
+CREATE POLICY "Users can update own event reads" ON user_event_reads
+  FOR UPDATE USING (auth.uid() = user_id);
+
 -- Function to sync email from auth.users to user_profiles
 -- This function bypasses RLS to allow automatic profile creation
 -- SECURITY DEFINER ensures it runs with elevated privileges to bypass RLS
