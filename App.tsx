@@ -21,14 +21,32 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// Helper function to add timeout to async operations
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Operation timed out')), timeoutMs)
+    ),
+  ]);
+};
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
+    // Safety timeout - ensure loading is always set to false after max 15 seconds
+    const safetyTimeout = setTimeout(() => {
+      console.warn('Safety timeout: Forcing loading to false');
+      setLoading(false);
+    }, 15000);
+
     // Check initial session
-    checkSession();
+    checkSession().finally(() => {
+      clearTimeout(safetyTimeout);
+    });
 
     // Handle deep linking for magic link authentication
     const handleDeepLink = async (url: string | null) => {
@@ -43,7 +61,9 @@ export default function App() {
     };
 
     // Get initial URL if app was opened via deep link
-    Linking.getInitialURL().then(handleDeepLink);
+    Linking.getInitialURL().then(handleDeepLink).catch(err => {
+      console.error('Error getting initial URL:', err);
+    });
 
     // Listen for deep links while app is running
     const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
@@ -54,15 +74,25 @@ export default function App() {
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event);
-        if (session?.user) {
-          setUser(session.user);
-          const profile = await getUserProfile(session.user.id);
-          setUserProfile(profile);
-        } else {
-          setUser(null);
-          setUserProfile(null);
+        try {
+          if (session?.user) {
+            setUser(session.user);
+            try {
+              const profile = await withTimeout(getUserProfile(session.user.id), 10000);
+              setUserProfile(profile);
+            } catch (error) {
+              console.error('Error fetching user profile in auth state change:', error);
+              // Continue without profile - user can still proceed
+            }
+          } else {
+            setUser(null);
+            setUserProfile(null);
+          }
+        } catch (error) {
+          console.error('Error in auth state change handler:', error);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -74,25 +104,42 @@ export default function App() {
 
   const checkSession = async () => {
     try {
-      const currentUser = await getCurrentUser();
+      // Add timeout to prevent hanging
+      const currentUser = await withTimeout(getCurrentUser(), 10000);
       if (currentUser) {
         setUser(currentUser);
-        const profile = await getUserProfile(currentUser.id);
-        setUserProfile(profile);
+        try {
+          const profile = await withTimeout(getUserProfile(currentUser.id), 10000);
+          setUserProfile(profile);
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+          // Continue without profile - user can still proceed
+        }
       }
     } catch (error) {
       console.error('Error checking session:', error);
+      // If there's a timeout or error, still allow the app to proceed
     } finally {
+      // Always set loading to false, even if operations fail or timeout
       setLoading(false);
     }
   };
 
   const handleAuthSuccess = async () => {
-    const currentUser = await getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      const profile = await getUserProfile(currentUser.id);
-      setUserProfile(profile);
+    try {
+      const currentUser = await withTimeout(getCurrentUser(), 10000);
+      if (currentUser) {
+        setUser(currentUser);
+        try {
+          const profile = await withTimeout(getUserProfile(currentUser.id), 10000);
+          setUserProfile(profile);
+        } catch (error) {
+          console.error('Error fetching user profile in handleAuthSuccess:', error);
+          // Continue without profile - user can still proceed
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleAuthSuccess:', error);
     }
   };
 
