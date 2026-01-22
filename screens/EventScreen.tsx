@@ -1,42 +1,60 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PersonalizedEvent } from '../types';
-import { getActiveEvent, markEventAsRead } from '../services/eventService';
+import { getEventRecommendations, markEventAsRead } from '../services/eventService';
 import { getCurrentUser } from '../services/authService';
 import { Header } from '../components/Header';
+import { EventTile } from '../components/EventTile';
+import { EventDetailModal } from '../components/EventDetailModal';
+
+const { width } = Dimensions.get('window');
+const PADDING = 12;
+const GAP = 12;
+const TILE_WIDTH = (width - PADDING * 2 - GAP) / 2; // 2 columns with padding and gap
 
 export const EventScreen: React.FC = () => {
-  const [event, setEvent] = useState<PersonalizedEvent | null>(null);
+  const [events, setEvents] = useState<PersonalizedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<PersonalizedEvent | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const loadEvent = async () => {
+  const loadEvents = async () => {
     const user = await getCurrentUser();
     if (!user) {
       setLoading(false);
       return;
     }
 
-    const activeEvent = await getActiveEvent(user.id);
-    setEvent(activeEvent);
+    const eventRecommendations = await getEventRecommendations(user.id, 20);
+    setEvents(eventRecommendations);
     setLoading(false);
-
-    // Mark event as read when displayed (only if not already read)
-    // This prevents duplicate entries but allows the event to persist on refresh
-    if (activeEvent) {
-      await markEventAsRead(user.id, activeEvent.id);
-    }
   };
 
   useEffect(() => {
-    loadEvent();
+    loadEvents();
   }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadEvent();
+    await loadEvents();
     setRefreshing(false);
+  };
+
+  const handleTilePress = async (event: PersonalizedEvent) => {
+    const user = await getCurrentUser();
+    if (user) {
+      // Mark event as read when opened
+      await markEventAsRead(user.id, event.id);
+    }
+    setSelectedEvent(event);
+    setModalVisible(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedEvent(null);
   };
 
   if (loading) {
@@ -50,21 +68,25 @@ export const EventScreen: React.FC = () => {
     );
   }
 
-  if (!event) {
+  if (events.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <Header />
-        <ScrollView
+        <FlatList
+          data={[]}
           contentContainerStyle={styles.centerContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
-        >
-          <Text style={styles.emptyTitle}>No new events</Text>
-          <Text style={styles.emptyText}>
-            Check back later for updates on what matters.
-          </Text>
-        </ScrollView>
+          ListEmptyComponent={
+            <>
+              <Text style={styles.emptyTitle}>No new events</Text>
+              <Text style={styles.emptyText}>
+                Check back later for updates on what matters.
+              </Text>
+            </>
+          }
+        />
       </SafeAreaView>
     );
   }
@@ -72,47 +94,31 @@ export const EventScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <Header />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+      <FlatList
+        data={events}
+        renderItem={({ item, index }) => (
+          <View style={[
+            styles.tileContainer,
+            index % 2 === 0 && styles.tileLeft,
+            index % 2 === 1 && styles.tileRight,
+          ]}>
+            <EventTile event={item} onPress={() => handleTilePress(item)} />
+          </View>
+        )}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
+        contentContainerStyle={styles.gridContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
         showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={styles.category}>{event.category}</Text>
-          <Text style={styles.date}>{new Date(event.date).toLocaleDateString()}</Text>
-        </View>
-
-        <Text style={styles.title}>{event.title}</Text>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>What happened</Text>
-          <Text style={styles.sectionContent}>{event.whatHappened}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Why people care</Text>
-          <Text style={styles.sectionContent}>{event.whyPeopleCare}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>What this might mean for you</Text>
-          <Text style={styles.sectionContent}>
-            {event.personalizedWhatThisMeans}
-          </Text>
-        </View>
-
-        {event.whatLikelyDoesNotChange && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>What likely does not change</Text>
-            <Text style={styles.sectionContent}>
-              {event.whatLikelyDoesNotChange}
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+      />
+      <EventDetailModal
+        event={selectedEvent}
+        visible={modalVisible}
+        onClose={handleCloseModal}
+      />
     </SafeAreaView>
   );
 };
@@ -121,13 +127,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 24,
-    paddingBottom: 48,
   },
   centerContent: {
     flex: 1,
@@ -152,42 +151,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  header: {
+  gridContent: {
+    padding: PADDING,
+    paddingBottom: 48,
+  },
+  row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: GAP,
   },
-  category: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  tileContainer: {
+    width: TILE_WIDTH,
   },
-  date: {
-    fontSize: 14,
-    color: '#999',
+  tileLeft: {
+    marginRight: GAP / 2,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: '#000',
-    marginBottom: 32,
-    lineHeight: 40,
-  },
-  section: {
-    marginBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: 12,
-  },
-  sectionContent: {
-    fontSize: 18,
-    color: '#333',
-    lineHeight: 28,
+  tileRight: {
+    marginLeft: GAP / 2,
   },
 });
