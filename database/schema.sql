@@ -108,15 +108,36 @@ CREATE POLICY "Users can insert own event reads" ON user_event_reads
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Function to sync email from auth.users to user_profiles
+-- This function bypasses RLS to allow automatic profile creation
+-- SECURITY DEFINER ensures it runs with elevated privileges to bypass RLS
 CREATE OR REPLACE FUNCTION sync_user_email()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE plpgsql
+AS $$
 BEGIN
-  INSERT INTO user_profiles (id, email)
-  VALUES (NEW.id, NEW.email)
-  ON CONFLICT (id) DO UPDATE SET email = NEW.email;
+  INSERT INTO user_profiles (id, email, created_at, updated_at)
+  VALUES (
+    NEW.id, 
+    COALESCE(NEW.email, ''), 
+    NOW(), 
+    NOW()
+  )
+  ON CONFLICT (id) 
+  DO UPDATE SET 
+    email = EXCLUDED.email,
+    updated_at = NOW();
+  
   RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log warning but don't fail the transaction
+    -- This allows user creation to succeed even if profile creation fails
+    RAISE WARNING 'Error in sync_user_email for user %: %', NEW.id, SQLERRM;
+    RETURN NEW;
 END;
-$$ language 'plpgsql' SECURITY DEFINER;
+$$;
 
 -- Trigger to sync email on user creation
 CREATE TRIGGER on_auth_user_created
