@@ -131,16 +131,18 @@ export default function App() {
         ) : (
           <>
             <Stack.Screen name="Event" component={EventScreen} />
-            <Stack.Screen
-              name="Admin"
-              component={AdminScreen}
-              options={{
-                headerShown: true,
-                title: 'Admin',
-                headerStyle: { backgroundColor: '#fff' },
-                headerTintColor: '#000',
-              }}
-            />
+            {userProfile?.isAdmin && (
+              <Stack.Screen
+                name="Admin"
+                component={AdminScreen}
+                options={{
+                  headerShown: true,
+                  title: 'Admin',
+                  headerStyle: { backgroundColor: '#fff' },
+                  headerTintColor: '#000',
+                }}
+              />
+            )}
           </>
         )}
       </Stack.Navigator>

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { TextInput } from '../components/TextInput';
 import { Button } from '../components/Button';
 import { createEvent } from '../services/eventService';
+import { getCurrentUser, getUserProfile } from '../services/authService';
 import { EventCategory } from '../types';
 
 const CATEGORIES: { value: EventCategory; label: string }[] = [
@@ -29,6 +30,25 @@ export const AdminScreen: React.FC = () => {
   const [expiresInDays, setExpiresInDays] = useState('7');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const user = await getCurrentUser();
+      if (user) {
+        const profile = await getUserProfile(user.id);
+        const adminStatus = profile?.isAdmin || false;
+        setIsAdmin(adminStatus);
+        if (!adminStatus) {
+          // Redirect to Event screen if not admin
+          navigation.navigate('Event' as never);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+    };
+    checkAdminStatus();
+  }, [navigation]);
 
   const handleSubmit = async () => {
     if (!title || !whatHappened || !whyPeopleCare || !whatThisMeans) {
@@ -71,6 +91,22 @@ export const AdminScreen: React.FC = () => {
 
     setLoading(false);
   };
+
+  // Show loading or nothing while checking admin status
+  if (isAdmin === null) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.centerContent}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If not admin, don't render the form (will redirect)
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -214,5 +250,14 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
   },
 });

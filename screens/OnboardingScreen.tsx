@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../components/Button';
-import { TextInput } from '../components/TextInput';
+import { CountryAutocomplete } from '../components/CountryAutocomplete';
 import { OnboardingData, CareerField, Interest, RiskTolerance } from '../types';
 
 interface OnboardingScreenProps {
@@ -95,11 +95,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
             <Text style={styles.stepDescription}>
               This helps us provide relevant context for events.
             </Text>
-            <TextInput
+            <CountryAutocomplete
               value={country}
               onChangeText={setCountry}
               placeholder="Country"
-              autoCapitalize="words"
             />
           </View>
         );

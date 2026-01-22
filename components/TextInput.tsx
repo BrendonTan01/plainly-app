@@ -11,6 +11,8 @@ interface TextInputProps {
   secureTextEntry?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
@@ -23,6 +25,8 @@ export const TextInput: React.FC<TextInputProps> = ({
   secureTextEntry = false,
   multiline = false,
   numberOfLines = 1,
+  onFocus,
+  onBlur,
 }) => {
   return (
     <View style={styles.container}>
@@ -41,6 +45,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         secureTextEntry={secureTextEntry}
         multiline={multiline}
         numberOfLines={numberOfLines}
+        onFocus={onFocus}
+        onBlur={onBlur}
       />
     </View>
   );

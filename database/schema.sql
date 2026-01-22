@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   interests TEXT[] DEFAULT '{}',
   risk_tolerance TEXT CHECK (risk_tolerance IN ('low', 'medium', 'high')),
   onboarding_completed BOOLEAN DEFAULT false,
+  is_admin BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -49,6 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_events_expires_at ON events(expires_at);
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_event_reads_user_id ON user_event_reads(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_event_reads_event_id ON user_event_reads(event_id);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_is_admin ON user_profiles(is_admin) WHERE is_admin = true;
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

@@ -1,10 +1,22 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { signOut } from '../services/authService';
+import { signOut, getCurrentUser, getUserProfile } from '../services/authService';
 
 export const Header: React.FC = () => {
   const navigation = useNavigation();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const user = await getCurrentUser();
+      if (user) {
+        const profile = await getUserProfile(user.id);
+        setIsAdmin(profile?.isAdmin || false);
+      }
+    };
+    checkAdminStatus();
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -15,12 +27,14 @@ export const Header: React.FC = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Plainly</Text>
       <View style={styles.actions}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('Admin' as never)}
-          style={styles.button}
-        >
-          <Text style={styles.buttonText}>Admin</Text>
-        </TouchableOpacity>
+        {isAdmin && (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Admin' as never)}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Admin</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={handleSignOut} style={styles.button}>
           <Text style={styles.buttonText}>Sign Out</Text>
         </TouchableOpacity>

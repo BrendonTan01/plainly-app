@@ -22,6 +22,7 @@ export interface UserProfile {
   interests: Interest[];
   riskTolerance: RiskTolerance;
   onboardingCompleted: boolean;
+  isAdmin: boolean;
   createdAt: string;
   updatedAt: string;
 }

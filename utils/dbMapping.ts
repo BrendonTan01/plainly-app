@@ -12,6 +12,7 @@ export function mapUserProfileFromDb(data: any): UserProfile {
     interests: data.interests || [],
     riskTolerance: data.risk_tolerance,
     onboardingCompleted: data.onboarding_completed || false,
+    isAdmin: data.is_admin || false,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
   };
