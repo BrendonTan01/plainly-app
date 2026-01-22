@@ -51,7 +51,12 @@ async function fetchHtmlFromUrl(url: string): Promise<string> {
     try {
       response = await fetch(finalUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PlainlyBot/1.0)',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
         },
       });
     } catch (fetchError: any) {
@@ -68,6 +73,16 @@ async function fetchHtmlFromUrl(url: string): Promise<string> {
     }
 
     if (!response.ok) {
+      // Provide specific error messages for common status codes
+      if (response.status === 403) {
+        throw new Error(`403 Forbidden: The website blocked the request. This is common when websites detect automated requests or have CORS restrictions. Solutions: 1) Use a backend proxy service, 2) Use a service like Firecrawl or ScraperAPI, 3) The website may require authentication or have anti-bot protection.`);
+      } else if (response.status === 404) {
+        throw new Error(`404 Not Found: The URL does not exist or has been removed.`);
+      } else if (response.status === 429) {
+        throw new Error(`429 Too Many Requests: Rate limit exceeded. Please wait before trying again.`);
+      } else if (response.status >= 500) {
+        throw new Error(`${response.status} Server Error: The website's server is experiencing issues. Please try again later.`);
+      }
       throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}. The server returned an error.`);
     }
 
