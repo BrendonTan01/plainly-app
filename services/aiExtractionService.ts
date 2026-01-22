@@ -20,28 +20,71 @@ export interface ExtractedEventData {
  */
 async function fetchHtmlFromUrl(url: string): Promise<string> {
   try {
-    // Validate URL
-    const urlObj = new URL(url);
+    // Trim and validate URL is not empty
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      throw new Error('URL cannot be empty');
+    }
+
+    // Validate URL format
+    let urlObj: URL;
+    try {
+      // Add protocol if missing
+      let urlToValidate = trimmedUrl;
+      if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+        urlToValidate = `https://${trimmedUrl}`;
+      }
+      urlObj = new URL(urlToValidate);
+    } catch (urlError) {
+      throw new Error(`Invalid URL format: ${trimmedUrl}. Please include http:// or https://`);
+    }
+
     if (!['http:', 'https:'].includes(urlObj.protocol)) {
       throw new Error('URL must use http or https protocol');
     }
 
+    // Use the validated URL
+    const finalUrl = urlObj.toString();
+
     // Fetch the page
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PlainlyBot/1.0)',
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(finalUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PlainlyBot/1.0)',
+        },
+      });
+    } catch (fetchError: any) {
+      // Handle network errors
+      if (fetchError.message?.includes('Network request failed') || 
+          fetchError.message?.includes('Failed to fetch') ||
+          fetchError.message?.includes('NetworkError')) {
+        throw new Error('Network error: Unable to reach the URL. This may be due to CORS restrictions, network connectivity, or the website blocking requests. Consider using a backend proxy service.');
+      }
+      if (fetchError.message?.includes('CORS')) {
+        throw new Error('CORS error: The website blocked the request. This is common in React Native. Consider using a backend proxy or service like Firecrawl.');
+      }
+      throw new Error(`Failed to fetch URL: ${fetchError.message || 'Unknown network error'}`);
+    }
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}. The server returned an error.`);
     }
 
     const html = await response.text();
+    
+    if (!html || html.length === 0) {
+      throw new Error('Received empty response from the URL');
+    }
+
     return html;
   } catch (error) {
     console.error('Error fetching URL:', error);
-    throw error;
+    // Re-throw with improved error message if it's not already an Error
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Unexpected error while fetching URL: ${String(error)}`);
   }
 }
 

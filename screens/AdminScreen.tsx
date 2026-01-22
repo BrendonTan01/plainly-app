@@ -38,6 +38,7 @@ export const AdminScreen: React.FC = () => {
   const [expiresInDays, setExpiresInDays] = useState('7');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -61,11 +62,13 @@ export const AdminScreen: React.FC = () => {
   const handleExtractFromUrl = async () => {
     if (!url || !url.trim()) {
       setMessage('Please enter a valid URL');
+      setMessageType('error');
       return;
     }
 
     setExtracting(true);
     setMessage('');
+    setMessageType('info');
 
     try {
       const extracted = await extractFromUrl(url.trim());
@@ -93,12 +96,15 @@ export const AdminScreen: React.FC = () => {
       if (draft) {
         setCurrentDraftId(draft.id);
         setMessage('Content extracted successfully! Review and edit before publishing.');
+        setMessageType('success');
       } else {
         setMessage('Content extracted, but failed to save draft.');
+        setMessageType('error');
       }
     } catch (error) {
       console.error('Extraction error:', error);
       setMessage(error instanceof Error ? error.message : 'Failed to extract content from URL. Please try again.');
+      setMessageType('error');
     } finally {
       setExtracting(false);
     }
@@ -335,7 +341,11 @@ export const AdminScreen: React.FC = () => {
             />
 
             {message ? (
-              <Text style={styles.message}>{message}</Text>
+              <Text style={[
+                styles.message,
+                messageType === 'error' && styles.messageError,
+                messageType === 'success' && styles.messageSuccess
+              ]}>{message}</Text>
             ) : null}
 
             <Button
@@ -391,6 +401,14 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  messageError: {
+    color: '#d32f2f',
+    fontWeight: '500',
+  },
+  messageSuccess: {
+    color: '#2e7d32',
+    fontWeight: '500',
   },
   centerContent: {
     flex: 1,
